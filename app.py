@@ -6,6 +6,16 @@ import gradio as gr
 from PIL import Image
 import numpy as np
 from glob import glob
+from shapely.geometry import Point, Polygon
+
+
+
+def filter_coordinates(polygon_coordinates, points_to_filter):
+    polygon = Polygon(polygon_coordinates)
+    filtered = [(i,point) for i,point in enumerate(points_to_filter) if not Point(point).within(polygon)]
+    filtered_points = [fil[1] for fil in filtered]
+    filtered_index = [fil[0] for fil in filtered]
+    return filtered_points, filtered_index
 
 
 def find_object(base, obj, result):
@@ -24,7 +34,7 @@ def find_object(base, obj, result):
     
     # Perform k-nn matching and filter using Lowe's ratio test
     matches = flann.knnMatch(descr_obj, descr_base, k=2)
-    matches = [[i] for i, j in matches if i.distance < 0.75 * j.distance]
+    matches = [[i] for i, j in matches if i.distance < 0.75* j.distance]
 
     if len(matches) > 10:
         # Extract corresponding points for homography calculation
@@ -55,6 +65,11 @@ def find_object(base, obj, result):
             (255, 255, 255),
             1,
         )
+                
+        polygon_coordinates = [tuple(ds[0]) for ds in dst] 
+        points_to_filter = [tuple(dst_pt[0]) for dst_pt in dst_pts]
+        filtered_points, filtered_index = filter_coordinates(polygon_coordinates, points_to_filter)
+        matches = [match for i, match in enumerate(matches) if i not in filtered_index]
         matching_img = cv2.drawMatchesKnn(
             obj["image"], keypts_obj, base["image"], keypts_base, matches, None, flags=2
         )
